@@ -36,4 +36,13 @@ class DefaultZooKeeperReentrantData extends AbstractZooKeeperData implements Ser
     public void setOwner(OwnerGenerator.Owner owner) {
         this.owner = owner;
     }
+
+
+    @Override
+    public String toString() {
+        return "DefaultZooKeeperReentrantData{" +
+                "count=" + count +
+                ", owner=" + owner +
+                '}';
+    }
 }

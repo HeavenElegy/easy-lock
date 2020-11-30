@@ -2,17 +2,21 @@ package com.elegy.heaven.lock.zookeeper;
 
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
- * zoo锁事件总线
+ * 事件总线抽象声明
+ * @author lixiaoxi_v
  */
 public abstract class AbstractZooKeeperEventBus implements Watcher {
+
+    protected Logger logger = LoggerFactory.getLogger(getClass());
 
     /**
      * 处理器映射
@@ -22,22 +26,31 @@ public abstract class AbstractZooKeeperEventBus implements Watcher {
     public AbstractZooKeeperEventBus() {
         // 初始化处理器映射
         for (EventHandler eventHandler : getInitEventHandlers()) {
-            List<EventHandler> handlerList;
-            if (Objects.isNull(handlerList = handlerMapping.get(eventHandler.support()))) {
-                handlerList = new ArrayList<>();
+            if(logger.isDebugEnabled()) {
+                logger.debug("init zookeeper lock event handler -> {type: {}, class: {}}",
+                        eventHandler.support(),
+                        eventHandler.getClass());
             }
+            List<EventHandler> handlerList =
+                    handlerMapping.computeIfAbsent(
+                            eventHandler.support(),
+                            key -> new ArrayList<>());
             handlerList.add(eventHandler);
-            handlerMapping.put(eventHandler.support(), handlerList);
         }
     }
 
     @Override
     public void process(WatchedEvent event) {
-        System.out.println(event);
+        if(logger.isDebugEnabled()) {
+            logger.debug(">>> receive event -> {type: {}, path: {}}", event.getType(), event.getPath());
+        }
         List<EventHandler> handlerList;
         if ((handlerList = handlerMapping.get(event.getType())) != null) {
             // 委托到声明的处理器处理
             handlerList.forEach(item -> item.process(event));
+            if(logger.isDebugEnabled()) {
+                logger.debug("<<< qualified event handler -> {}", handlerList);
+            }
         }
     }
 
@@ -46,12 +59,17 @@ public abstract class AbstractZooKeeperEventBus implements Watcher {
      *
      * @param lock 目标锁,不能为空
      */
-    public void addEvent(Event.EventType eventType, ZooKeeperReentrantLock lock) {
+    public void addWaiter(Event.EventType eventType, ZooKeeperReentrantLock lock) {
+        if(logger.isDebugEnabled()) {
+            logger.debug(">>> add waiter -> {type: {}, lock: {}}", eventType, lock.getPath());
+        }
         if (handlerMapping.containsKey(eventType)) {
             // 委托到声明的处理器处理
-            handlerMapping.get(eventType).forEach(item -> item.postCreateEvent(eventType, lock));
+            handlerMapping.get(eventType).forEach(item -> item.afterAddWaiter(eventType, lock));
+            if(logger.isDebugEnabled()) {
+                logger.debug("<<< invoke postAddWaiter -> {}", handlerMapping.get(eventType));
+            }
         }
-//        ZooKeeperLockSupport.zookeeperHolder.addWatch(lock.getPath(), this);
     }
 
     /**
@@ -71,7 +89,10 @@ public abstract class AbstractZooKeeperEventBus implements Watcher {
         @Override
         void process(WatchedEvent event);
 
-        void postCreateEvent(Event.EventType eventType, ZooKeeperReentrantLock lock);
+        /**
+         * 添加等待队列(并不是队列)后调用
+         */
+        void afterAddWaiter(Event.EventType eventType, ZooKeeperReentrantLock lock);
     }
 
     /**

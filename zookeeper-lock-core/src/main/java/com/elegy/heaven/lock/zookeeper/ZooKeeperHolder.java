@@ -8,6 +8,8 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -20,6 +22,8 @@ import java.util.Objects;
  */
 public class ZooKeeperHolder {
 
+    private Logger logger = LoggerFactory.getLogger(getClass());
+
     private ZooKeeper zooKeeper;
     public static final int MINUS_ONE = -1;
 
@@ -27,18 +31,30 @@ public class ZooKeeperHolder {
         this.zooKeeper = zooKeeper;
     }
 
+    /**
+     * 创建节点
+     */
     public boolean create(String key, AbstractZooKeeperData data) {
 
         try {
+            if(logger.isDebugEnabled()) {
+                logger.debug(">>> occupy node -> {path: {}, data: {}}", key, data);
+            }
             zooKeeper.create(
                     key,
                     SerializationUtils.serialize(data),
                     ZooDefs.Ids.OPEN_ACL_UNSAFE,
                     CreateMode.PERSISTENT);
+            if(logger.isDebugEnabled()) {
+                logger.debug("<<< occupy node succeed -> {path: {}, data: {}}", key, data);
+            }
             return true;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (KeeperException e) {
+            if(logger.isDebugEnabled()) {
+                logger.error("<<< occupy node unsuccessful -> {path: {}, data: {}, err: {}}", key, data, e.getMessage());
+            }
             return false;
         }
     }

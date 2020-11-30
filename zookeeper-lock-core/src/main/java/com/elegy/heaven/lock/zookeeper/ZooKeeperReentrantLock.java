@@ -2,7 +2,6 @@ package com.elegy.heaven.lock.zookeeper;
 
 import org.apache.zookeeper.Watcher;
 
-import java.io.File;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.AbstractQueuedSynchronizer;
@@ -79,7 +78,7 @@ public class ZooKeeperReentrantLock extends ZooKeeperLockSupport implements Lock
         protected boolean tryAcquire(int acquires, boolean addWatcher) {
             boolean result = casAddNode(acquires);
             if (!result && addWatcher) {
-                zooKeeperLockEventBus.addEvent(Watcher.Event.EventType.NodeDeleted, ZooKeeperReentrantLock.this);
+                zooKeeperLockEventBus.addWaiter(Watcher.Event.EventType.NodeDeleted, ZooKeeperReentrantLock.this);
             }
             return result;
         }
@@ -89,6 +88,9 @@ public class ZooKeeperReentrantLock extends ZooKeeperLockSupport implements Lock
             return SKIP_RELEASE == releases || casReduceCount(releases);
         }
 
+        /**
+         * 仿造cas进行占用操作
+         */
         private boolean casAddNode(int acquires) {
             boolean result;
             if (zookeeperHolder.exists(path)) {
@@ -111,6 +113,9 @@ public class ZooKeeperReentrantLock extends ZooKeeperLockSupport implements Lock
             return result;
         }
 
+        /**
+         * 减小计数
+         */
         private boolean casReduceCount(int releases) {
             // 不存在直接返回
             if (!zookeeperHolder.exists(path)) {
@@ -131,7 +136,7 @@ public class ZooKeeperReentrantLock extends ZooKeeperLockSupport implements Lock
             int count = data.getCount();
             int residue;
             if ((residue = count - releases) < 0) {
-                throw new IllegalArgumentException("释放计数不足 -> [" + count + ":" + releases + "]");
+                throw new IllegalArgumentException("释放计数过大 -> [" + count + ":" + releases + "]");
             } else if (residue == 0) {
                 // 释放锁
                 zookeeperHolder.delete(path);

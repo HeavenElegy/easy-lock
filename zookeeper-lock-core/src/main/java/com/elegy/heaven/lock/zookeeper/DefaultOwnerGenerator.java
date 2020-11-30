@@ -53,5 +53,15 @@ public class DefaultOwnerGenerator implements OwnerGenerator<DefaultOwnerGenerat
                     && in.threadId.equals(this.threadId)
                     && in.threadName.equals(this.threadName);
         }
+
+        @Override
+        public String
+        toString() {
+            return "DefaultOwner{" +
+                    "uuid='" + uuid + '\'' +
+                    ", threadId='" + threadId + '\'' +
+                    ", threadName='" + threadName + '\'' +
+                    '}';
+        }
     }
 }

@@ -11,7 +11,7 @@ import java.util.concurrent.locks.Lock;
  * @date 2020-11-18 18:51:14
  */
 public abstract class ZooKeeperLockSupport implements Lock {
-    protected static AbstractZooKeeperEventBus zooKeeperLockEventBus;
+    protected static DefaultZooKeeperEventBus zooKeeperLockEventBus;
     protected static ZooKeeperHolder zookeeperHolder;
     protected static OwnerGenerator<? extends OwnerGenerator.Owner> ownerGenerator;
 
@@ -25,6 +25,7 @@ public abstract class ZooKeeperLockSupport implements Lock {
                         connectString,
                         (int) sessionTimeout,
                         zooKeeperLockEventBus));
+                zooKeeperLockEventBus.setZooKeeperHolder(zookeeperHolder);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

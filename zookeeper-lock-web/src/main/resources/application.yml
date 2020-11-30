@@ -5,3 +5,6 @@ zookeeper:
     enabled: true
 server:
   port: 9001
+logging:
+  level:
+    com.elegy.heaven.lock: debug

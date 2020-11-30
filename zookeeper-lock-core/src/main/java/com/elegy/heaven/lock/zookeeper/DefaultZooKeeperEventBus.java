@@ -2,7 +2,6 @@ package com.elegy.heaven.lock.zookeeper;
 
 import org.apache.zookeeper.WatchedEvent;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,7 +23,7 @@ public class DefaultZooKeeperEventBus extends AbstractZooKeeperEventBus {
     public List<EventHandler> getInitEventHandlers() {
         // TODO: 2020/11/30 这里暂时这么写
         NodeDeleteEventHandler nodeDeleteEventHandler = new NodeDeleteEventHandler();
-        new Thread(nodeDeleteEventHandler, "NodeDeleteCompensationThread").start();
+//        new Thread(nodeDeleteEventHandler, "NodeDeleteCompensationThread").start();
         return Collections.singletonList(nodeDeleteEventHandler);
     }
 
@@ -60,18 +59,12 @@ public class DefaultZooKeeperEventBus extends AbstractZooKeeperEventBus {
         @Override
         public void afterAddWaiter(Event.EventType eventType, ZooKeeperReentrantLock lock) {
             String path = lock.getPath();
-            Object mutex = mutexMapping.get(path);
-            if (mutex == null) {
-                synchronized (mutexMapping) {
-                    mutex = mutexMapping.get(path);
-                    if (mutex == null) {
-                        mutex = new Object();
-                        mutexMapping.put(path, mutex);
-                        pathToLock.put(path, new HashSet<>());
-                    }
-                }
-            }
+            Object mutex = getMutex(path);
             synchronized (mutex) {
+                // 这里进行自旋更新，因为NodeDeleteEventHandler#doProcess方法在拥有锁时，可以对monitor进行删除，所以需要进行自旋更新
+                while (!mutexMapping.containsKey(path)) {
+                    mutex = getMutex(path);
+                }
                 pathToLock.get(path).add(lock);
             }
         }
@@ -84,28 +77,13 @@ public class DefaultZooKeeperEventBus extends AbstractZooKeeperEventBus {
             if (logger.isDebugEnabled()) {
                 logger.debug("processing path {} by {}", path, getClass());
             }
-            // 同步下进行当前path初始化
-            Object mutex = mutexMapping.get(path);
-            Set<ZooKeeperReentrantLock> locks;
-            if (mutex == null) {
-                synchronized (mutexMapping) {
-                    mutex = mutexMapping.get(path);
-                    if (mutex == null) {
-                        mutex = new Object();
-                        mutexMapping.put(path, mutex);
-                        pathToLock.put(path, new HashSet<>());
-                    }
-                }
-            }
-
             // 同步下进行唤醒操作
-            synchronized (mutex) {
+            synchronized (getMutex(path)) {
+                Set<ZooKeeperReentrantLock> locks;
                 if ((locks = pathToLock.get(path)) == null || locks.isEmpty()) {
                     if (logger.isDebugEnabled()) {
                         logger.debug("processing spiked queue is empty");
                     }
-                    mutexMapping.remove(path);
-                    pathToLock.remove(path);
                     return;
                 }
                 ZooKeeperReentrantLock lock = locks.iterator().next();
@@ -152,7 +130,24 @@ public class DefaultZooKeeperEventBus extends AbstractZooKeeperEventBus {
                 }
             }
         }
+
+        private Object getMutex(String path) {
+            Object mutex = mutexMapping.get(path);
+            if (mutex == null) {
+                synchronized (this) {
+                    mutex = mutexMapping.get(path);
+                    if (mutex == null) {
+                        mutex = new Object();
+                        mutexMapping.put(path, mutex);
+                        pathToLock.put(path, new HashSet<>());
+                    }
+                }
+            }
+
+            return mutex;
+        }
     }
+
 
     public void setZooKeeperHolder(ZooKeeperHolder zooKeeperHolder) {
         this.zooKeeperHolder = zooKeeperHolder;

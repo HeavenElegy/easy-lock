@@ -14,7 +14,7 @@ class ZookeeperLockWebApplicationTests {
      * 初始化
      */
     @BeforeAll
-    public void before() {
+    public static void before() {
         ZooKeeperLockSupport.init(
                 "127.0.0.1:2181",
                 20 * 1000,

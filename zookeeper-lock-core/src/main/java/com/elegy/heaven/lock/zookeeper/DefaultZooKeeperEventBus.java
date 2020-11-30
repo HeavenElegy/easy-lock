@@ -24,7 +24,7 @@ public class DefaultZooKeeperEventBus extends AbstractZooKeeperEventBus {
     public List<EventHandler> getInitEventHandlers() {
         // TODO: 2020/11/30 这里暂时这么写
         NodeDeleteEventHandler nodeDeleteEventHandler = new NodeDeleteEventHandler();
-//        new Thread(nodeDeleteEventHandler, "NodeDeleteCompensationThread").start();
+        new Thread(nodeDeleteEventHandler, "NodeDeleteCompensationThread").start();
         return Collections.singletonList(nodeDeleteEventHandler);
     }
 
